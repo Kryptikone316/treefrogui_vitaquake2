@@ -242,10 +242,14 @@ static const input_bind_t input_binds_pad[] = {
    [RETRO_DEVICE_ID_JOYPAD_Y]      = { "AUX2",       K_AUX2,       "weapnext" },
    [RETRO_DEVICE_ID_JOYPAD_SELECT] = { "SELECT",     K_ENTER,      "help" },
    [RETRO_DEVICE_ID_JOYPAD_START]  = { "START",      K_ESCAPE,     "" }, /* Menu Show */
-   [RETRO_DEVICE_ID_JOYPAD_UP]     = { "UPARROW",    K_UPARROW,    "invprev" },
-   [RETRO_DEVICE_ID_JOYPAD_DOWN]   = { "DOWNARROW",  K_DOWNARROW,  "invnext" },
-   [RETRO_DEVICE_ID_JOYPAD_LEFT]   = { "LEFTARROW",  K_LEFTARROW,  "inven" },
-   [RETRO_DEVICE_ID_JOYPAD_RIGHT]  = { "RIGHTARROW", K_RIGHTARROW, "invuse" },
+   /* TreeFrogUI: no analog stick on these handhelds, so the D-pad drives
+    * movement (the stock map left it on inventory, making the game unplayable).
+    * Menus still navigate via the K_*ARROW keycodes; only the in-game bind
+    * command (3rd field) changes. Up/Down = walk, Left/Right = turn. */
+   [RETRO_DEVICE_ID_JOYPAD_UP]     = { "UPARROW",    K_UPARROW,    "+forward" },
+   [RETRO_DEVICE_ID_JOYPAD_DOWN]   = { "DOWNARROW",  K_DOWNARROW,  "+back" },
+   [RETRO_DEVICE_ID_JOYPAD_LEFT]   = { "LEFTARROW",  K_LEFTARROW,  "+left" },
+   [RETRO_DEVICE_ID_JOYPAD_RIGHT]  = { "RIGHTARROW", K_RIGHTARROW, "+right" },
    [RETRO_DEVICE_ID_JOYPAD_A]      = { "AUX1",       K_AUX1,       "" }, /* Menu Select */
    [RETRO_DEVICE_ID_JOYPAD_X]      = { 0 },
    [RETRO_DEVICE_ID_JOYPAD_L]      = { "AUX3",       K_AUX3,       "+speed" },
