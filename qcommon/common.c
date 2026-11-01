@@ -92,6 +92,8 @@ Both client and server can use this, and it will output
 to the apropriate place.
 =============
 */
+#include "../libretro/sf3500_diag.h"
+
 void Com_Printf (char *fmt, ...)
 {
 	va_list		argptr;
@@ -115,6 +117,7 @@ void Com_Printf (char *fmt, ...)
 	}
 
 	Con_Print (msg);
+	Dbg_Log("con: %s", msg);
 		
 	// remove unprintable characters
 	for(i=0; i<msgLen; ++i)
@@ -221,6 +224,7 @@ void Com_Error (int code, char *fmt, ...)
 	else if (code == ERR_DROP)
 	{
 		Com_Printf ("********************\nERROR: %s\n********************\n", msg);
+		Dbg_DumpCrashLog(msg);
 		SV_Shutdown (va("Server crashed: %s\n", msg), false);
 		CL_Drop ();
 		recursive = false;

@@ -17,6 +17,7 @@ INCFLAGS  := \
 SYSTEM = \
 	$(LIBRETRO_DIR)/libretro.c \
 	$(LIBRETRO_DIR)/libretro_cdaudio.c \
+	$(LIBRETRO_DIR)/sf3500_diag.c \
 	$(LIBRETRO_DIR)/codec/ogg/bitwise.c \
 	$(LIBRETRO_DIR)/codec/ogg/framing.c \
 	$(LIBRETRO_DIR)/codec/tremor/block.c \

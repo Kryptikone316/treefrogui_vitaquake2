@@ -25,6 +25,8 @@
 #endif
 
 #include <ctype.h>
+#include <time.h>
+#include "sf3500_diag.h"
 #include <libretro.h>
 #include <libretro_file.h>
 #include <retro_dirent.h>
@@ -992,6 +994,8 @@ void Sys_Error (char *error, ...)
    vsnprintf (str,512, error, argptr);
    va_end (argptr);
    LOG_FILE("Sys_Error: %s", str);
+   Dbg_Log("Sys_Error: %s", str);
+   Dbg_DumpCrashLog(str);
    Sys_Quit();
 }
 
@@ -2167,6 +2171,17 @@ static enum retro_pixel_format fmt;
 bool retro_load_game(const struct retro_game_info *info)
 {
    int i;
+   Dbg_InstallCrashHandlers();
+   Dbg_Log("vitaQuakeII SF3500 build, content %s", info && info->path ? info->path : "(none)");
+   {
+      char line[128];
+      FILE *mi = fopen("/proc/meminfo", "r");
+      while (mi && fgets(line, sizeof(line), mi))
+         if (!strncmp(line, "MemTotal", 8) || !strncmp(line, "MemFree", 7) || !strncmp(line, "MemAvail", 8))
+         { line[strcspn(line, "\n")] = 0; Dbg_Log("%s", line); }
+      if (mi)
+         fclose(mi);
+   }
    char path_lower[1024];
    char parent_dir[1024];
    bool use_external_savedir = false;
@@ -2443,9 +2458,37 @@ static void retro_run_video(void)
    }
 }
 
+/* once a second: runs per second, time inside retro_run, worst run */
+static struct { double t0, busy, worst; int runs; } fstats;
+unsigned run_dt_us;   /* real time of the last run, microseconds (SF3500) */
+static double mono_now(void)
+{
+   struct timespec ts;
+   clock_gettime(CLOCK_MONOTONIC, &ts);
+   return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+static void frame_stats(double begin)
+{
+   double end = mono_now(), d = end - begin;
+   if (fstats.t0 == 0)
+      fstats.t0 = begin;
+   fstats.busy += d;
+   if (d > fstats.worst)
+      fstats.worst = d;
+   fstats.runs++;
+   if (end - fstats.t0 >= 1.0)
+   {
+      Dbg_Log("perf: %d runs/s, %.1f ms avg in core (%.0f%% busy), worst %.0f ms",
+              fstats.runs, fstats.busy * 1000 / fstats.runs, fstats.busy * 100 / (end - fstats.t0),
+              fstats.worst * 1000);
+      fstats.t0 = end; fstats.busy = fstats.worst = 0; fstats.runs = 0;
+   }
+}
+
 void retro_run(void)
 {
    bool updated = false;
+   double frame_begin = mono_now();
 #ifdef HAVE_OPENGL
    if (!is_soft_render)
    {
@@ -2480,6 +2523,11 @@ void retro_run(void)
       update_variables(false);
       set_input_binds();
       first_boot = false;
+      {
+         const char *c = getenv("Q2_CMD");   /* test hook, e.g. Q2_CMD="map base1" */
+         if (c)
+            Cbuf_AddText((char *)c), Cbuf_AddText("\n");
+      }
    }
 
    if (rumble_tick != 0)
@@ -2494,17 +2542,44 @@ void retro_run(void)
     * supports both software framebuffers and frame duplication. */
    sw_acquire_framebuffer();
 
+#ifdef SF3500
+   /* SF3500: the game is often slower than its nominal rate, so advance the clock (and the
+    * sound, see audio_callback) by the real time since the previous run instead of a fixed
+    * step, or everything plays in slow motion.  Clamped so a long hitch (a level load) does
+    * not become one giant step. */
+   {
+      static double last_run;
+      double now = mono_now(), dt = last_run ? now - last_run : framerate_ms / 1000.0;
+      static double ms_carry;
+      unsigned step;
+      last_run = now;
+      if (dt > 0.1) dt = 0.1;
+      if (dt < 0.001) dt = 0.001;
+      run_dt_us = (unsigned)(dt * 1e6);
+      ms_carry += dt * 1000.0;
+      step = (unsigned)ms_carry;
+      if (step < 1) step = 1;
+      ms_carry -= step;
+      if (ms_carry < 0) ms_carry = 0;
+      curtime += (int)step;
+      Qcommon_Frame(step);
+   }
+#else
    /* advance the deterministic frame clock (see its definition) by one
     * fixed timestep before simulating the frame */
    curtime += (int)framerate_ms;
 
    /* TODO/FIXME - argument should be changed into float for better accuracy of fixed timestep */
    Qcommon_Frame (framerate_ms);
+#endif
 
    if (shutdown_core)
       return;
    retro_run_video();
    audio_callback();
+   frame_stats(frame_begin);
+   if (getenv("Q2_CRASHTEST") && fstats.runs == 5)   /* test hook for the crash report */
+      *(volatile int *)0 = 1;
 }
 
 void retro_unload_game(void)
@@ -2595,7 +2670,20 @@ static void audio_callback(void)
     * worth of audio (frame_samps stereo pairs) and submit it.  No DMA read
     * cursor, no mix-ahead window, no wall-clock -- identical input yields
     * identical output (run-ahead / rewind / netplay safe). */
+#ifdef SF3500
+   /* sound for the real time that passed, with the fraction carried over */
+   static double samp_carry;
+   unsigned frame_samps;
+   {
+      double want = samp_carry + (double)audio_sample_rate * run_dt_us / 1e6;
+      frame_samps = (unsigned)want;
+      samp_carry = want - frame_samps;
+      if (frame_samps < 32) { frame_samps = 32; samp_carry = 0; }
+      if (frame_samps > (unsigned)audio_sample_rate / 8) { frame_samps = audio_sample_rate / 8; samp_carry = 0; }
+   }
+#else
    unsigned frame_samps            = audio_sample_rate / framerate; /* stereo pairs */
+#endif
    unsigned ringmask               = (AUDIO_BUFFER_SIZE >> 1) - 1;  /* ring is in pairs */
    unsigned audio_frames_remaining = frame_samps;
    int16_t *audio_out_ptr          = audio_out_buffer;

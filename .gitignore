@@ -55,3 +55,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+/sf3500/quakeloader/quakeloader.mipsel
+/sf3500/quakeloader/quakeloader_preview
+*.stripped.so

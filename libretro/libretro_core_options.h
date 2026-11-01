@@ -101,7 +101,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
 #endif
          { NULL, NULL },
       },
-#if defined(DINGUX)
+#if defined(DINGUX) || defined(SF3500)
       "320x240"
 #elif defined(_3DS)
       "400x240"
