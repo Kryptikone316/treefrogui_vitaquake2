@@ -218,16 +218,16 @@ static struct retro_input_descriptor input_desc[] = {
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "Move Forward" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "Move Back" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "Turn Right" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Jump / Menu Cancel" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Next Weapon / Menu Select" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Jump / Menu Cancel (with SELECT: Drop Item)" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Next Weapon / Menu Select (with SELECT: Previous Weapon)" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Freelook" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Attack" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Attack (with SELECT: Show Inventory)" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left (with SELECT: Previous Item)" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right (with SELECT: Next Item)" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Crouch" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Use Inventory Item" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "Drop Inventory Item" },
-   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Next Inventory Item" },
+   { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Second Layer / Help Computer (tap)" },
    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show Menu" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,  RETRO_DEVICE_ID_ANALOG_X, "Strafe" },
    { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,  RETRO_DEVICE_ID_ANALOG_Y, "Move" },
@@ -248,7 +248,7 @@ static const input_bind_t input_binds_pad[] = {
     * to the next item.  B and A still act as Cancel and Select in the menus. */
    [RETRO_DEVICE_ID_JOYPAD_B]      = { "AUX4",       K_AUX4,       "+moveup" },     /* jump; Menu Cancel */
    [RETRO_DEVICE_ID_JOYPAD_Y]      = { "AUX2",       K_AUX2,       "+attack" },
-   [RETRO_DEVICE_ID_JOYPAD_SELECT] = { "SELECT",     K_ENTER,      "invnext" },
+   [RETRO_DEVICE_ID_JOYPAD_SELECT] = { "SELECT",     K_ENTER,      "help" },       /* tap: help computer */
    [RETRO_DEVICE_ID_JOYPAD_START]  = { "START",      K_ESCAPE,     "" }, /* Menu Show */
    /* TreeFrogUI: no analog stick on these handhelds, so the D-pad drives
     * movement (the stock map left it on inventory, making the game unplayable).
@@ -267,6 +267,18 @@ static const input_bind_t input_binds_pad[] = {
    [RETRO_DEVICE_ID_JOYPAD_L3]     = { 0 },
    [RETRO_DEVICE_ID_JOYPAD_R3]     = { "AUX8",       K_AUX8,       "invdrop" },
 };
+/* SF3500: hold SELECT and press one of these for the second layer (a tap of SELECT alone
+ * opens the help computer, a menu "Enter"): previous / next item, previous weapon, drop the
+ * item, show the full inventory. */
+static const struct { int btn; const char *keyname; int keynum; const char *command; } input_binds_chord[] = {
+   { RETRO_DEVICE_ID_JOYPAD_L, "AUX10", K_AUX10, "invprev" },
+   { RETRO_DEVICE_ID_JOYPAD_R, "AUX11", K_AUX11, "invnext" },
+   { RETRO_DEVICE_ID_JOYPAD_A, "AUX12", K_AUX12, "weapprev" },
+   { RETRO_DEVICE_ID_JOYPAD_B, "AUX13", K_AUX13, "invdrop" },
+   { RETRO_DEVICE_ID_JOYPAD_Y, "AUX14", K_AUX14, "inven" },
+};
+#define INPUT_BINDS_CHORD_LEN (sizeof(input_binds_chord) / sizeof(input_binds_chord[0]))
+
 #define INPUT_BINDS_PAD_LEN (sizeof(input_binds_pad) / sizeof(input_binds_pad[0]))
 
 enum input_kb_key_type
@@ -554,6 +566,14 @@ static void set_input_binds(void)
    }
 
    Cbuf_AddText("unbindall\n");
+
+   if (quake_input_device != RETRO_DEVICE_KEYBOARD)
+      for (i = 0; i < INPUT_BINDS_CHORD_LEN; i++)
+      {
+         snprintf(buf, sizeof(buf), "bind %s \"%s\"\n",
+               input_binds_chord[i].keyname, input_binds_chord[i].command);
+         Cbuf_AddText(buf);
+      }
 
    for (i = 0; i < input_binds_len; i++)
    {
@@ -1053,6 +1073,15 @@ void Sys_DefaultConfig(void)
 extern menufield_s s_maxclients_field;
 char *targetKeyboard;
 void Sys_SetKeys(uint32_t keys, uint32_t state){
+   if (getenv("Q2_KEYLOG"))   /* test hook: log key changes */
+   {
+      static unsigned char last[512];
+      if (keys < 512 && last[keys] != (state ? 1 : 0))
+      {
+         last[keys] = state ? 1 : 0;
+         Dbg_Log("key %u %s", keys, state ? "down" : "up");
+      }
+   }
    Key_Event(keys, state, curtime);
 }
 
@@ -1162,56 +1191,60 @@ void Sys_SendKeyEvents (void)
          }
       }
 
-      /* Open Inventory */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_LEFT);
-
-      /* Inventory Previous */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_UP);
-
-      /* Inventory Next */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_DOWN);
-
-      /* Use Inventory Item */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_RIGHT);
-
-      /* Next Weapon */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_Y);
-
-      /* Run */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_L);
-
-      /* Crouch / Descend */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_R);
-
-      /* Jump / Climb */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_L2);
-
-      /* Attack */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_R2);
-
-      /* Drop Inventory Item */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_R3);
-
-      /* Next inventory item (SF3500) */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_SELECT);
-
-      /* Freelook (SF3500) */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_X);
-
-      /* Note: Menu open/cancel/select keys are
+      /* SF3500 button handling.  Note: Menu open/cancel/select keys are
        * arbitrarily hard-coded
        * > Show Menu: K_ESCAPE
        * > Cancel: K_AUX4
-       * > Select: K_AUX1 */
+       * > Select: K_AUX1
+       * SELECT is a layer key: held, L / R / A / B / Y send the keys of the second layer
+       * (see input_binds_chord) instead of their own; tapped, it sends K_ENTER (help
+       * computer in the game, Enter in the menus). */
+      {
+         static int sel_prev, sel_used, tap_frames;
+         int sel = (ret & (1 << RETRO_DEVICE_ID_JOYPAD_SELECT)) != 0;
+         int i, id;
+         static const int plain[] = {
+            RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_DOWN,
+            RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_ID_JOYPAD_L,
+            RETRO_DEVICE_ID_JOYPAD_R, RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_R2,
+            RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_START,
+            RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_A
+         };
 
-      /* Show Menu */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_START);
-
-      /* Menu Cancel */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_B);
-
-      /* Menu Select */
-      SET_BOUND_KEY_PAD(ret, RETRO_DEVICE_ID_JOYPAD_A);
+         for (i = 0; i < (int)(sizeof(plain) / sizeof(plain[0])); i++)
+         {
+            int in_chord = 0;
+            id = plain[i];
+            if (sel)
+            {
+               unsigned c;
+               for (c = 0; c < INPUT_BINDS_CHORD_LEN; c++)
+                  if (input_binds_chord[c].btn == id)
+                     in_chord = 1;
+            }
+            if (in_chord)
+               Sys_SetKeys(input_binds_pad[id].keynum, 0);
+            else
+               SET_BOUND_KEY_PAD(ret, id);
+         }
+         for (i = 0; i < (int)INPUT_BINDS_CHORD_LEN; i++)
+         {
+            int down = sel && (ret & (1 << input_binds_chord[i].btn));
+            if (down)
+               sel_used = 1;
+            Sys_SetKeys(input_binds_chord[i].keynum, down ? 1 : 0);
+         }
+         if (sel_prev && !sel)
+         {
+            if (!sel_used)
+               tap_frames = 2;
+            sel_used = 0;
+         }
+         sel_prev = sel;
+         Sys_SetKeys(K_ENTER, (!sel && tap_frames > 0) ? 1 : 0);
+         if (tap_frames > 0)
+            tap_frames--;
+      }
    }
 
    sys_frame_time = curtime;
