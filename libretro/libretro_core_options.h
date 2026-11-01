@@ -445,7 +445,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "enabled",  NULL },
          { NULL, NULL },
       },
+      #ifdef SF3500
+      "enabled"
+#else
       "disabled"
+#endif
    },
    {
       "vitaquakeii_aimfix",
